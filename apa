@@ -1,0 +1,12 @@
+-- Cara 1 (Paling Umum): Mengirim remote event ke server
+game:GetService("ReplicatedStorage"):WaitForChild("Networker"):FireServer("CompleteTutorial")
+
+-- Jika event di atas tidak bekerja, coba dengan parameter tambahan (misal: ID pemain atau angka random)
+game:GetService("ReplicatedStorage"):WaitForChild("Networker"):FireServer("CompleteTutorial", game.Players.LocalPlayer.UserId)
+
+-- Cara 2: Mengubah atribut karakter (jika tutorial dicek dari client-side)
+game.Players.LocalPlayer.Character:SetAttribute("TutorialDone", true)
+
+-- Cara 3: Menggunakan event alternatif (jika nama event berbeda)
+game:GetService("ReplicatedStorage"):WaitForChild("Networker"):FireServer("SkipTutorial")
+game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvent"):FireServer("FinishTutorial")
