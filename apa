@@ -1,12 +1,174 @@
--- Cara 1 (Paling Umum): Mengirim remote event ke server
-game:GetService("ReplicatedStorage"):WaitForChild("Networker"):FireServer("CompleteTutorial")
+-- =====================================================
+-- AUTO TUTORIAL - VERSI LOADING SCREEN
+-- Menunggu game siap, lalu selesaikan tutorial dengan aman.
+-- =====================================================
 
--- Jika event di atas tidak bekerja, coba dengan parameter tambahan (misal: ID pemain atau angka random)
-game:GetService("ReplicatedStorage"):WaitForChild("Networker"):FireServer("CompleteTutorial", game.Players.LocalPlayer.UserId)
+local player = game.Players.LocalPlayer
+local replicatedStorage = game:GetService("ReplicatedStorage")
 
--- Cara 2: Mengubah atribut karakter (jika tutorial dicek dari client-side)
-game.Players.LocalPlayer.Character:SetAttribute("TutorialDone", true)
+print("⏳ Menunggu game siap...")
 
--- Cara 3: Menggunakan event alternatif (jika nama event berbeda)
-game:GetService("ReplicatedStorage"):WaitForChild("Networker"):FireServer("SkipTutorial")
-game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvent"):FireServer("FinishTutorial")
+-- Tunggu sampai karakter dan GUI tersedia
+local function waitForGame()
+    repeat task.wait() until player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    repeat task.wait() until player:FindFirstChild("PlayerGui") and #player.PlayerGui:GetChildren() > 0
+    print("✅ Game siap!")
+end
+
+waitForGame()
+
+local gui = player.PlayerGui
+local allRemotes = {}
+
+-- =====================================================
+-- 1. Scan semua RemoteEvent di ReplicatedStorage
+-- =====================================================
+local function scanRemotes(obj, path)
+    for _, child in ipairs(obj:GetChildren()) do
+        if child:IsA("RemoteEvent") then
+            table.insert(allRemotes, {obj = child, path = path .. "." .. child.Name})
+        end
+        scanRemotes(child, path .. "." .. child.Name)
+    end
+end
+
+scanRemotes(replicatedStorage, "ReplicatedStorage")
+print("📡 RemoteEvent ditemukan:", #allRemotes)
+
+-- =====================================================
+-- 2. Cari RemoteEvent tutorial yang paling mungkin
+-- =====================================================
+local tutorialRemote = nil
+for _, info in ipairs(allRemotes) do
+    local name = info.obj.Name:lower()
+    if name:find("tutorial") or name:find("tut") or name:find("complete") or name:find("finish") then
+        tutorialRemote = info.obj
+        print("✅ RemoteEvent tutorial:", info.path)
+        break
+    end
+end
+
+-- =====================================================
+-- 3. Fungsi kirim event (aman, hanya 1 kali)
+-- =====================================================
+local function trySendEvent(remote, ...)
+    local success, err = pcall(function()
+        remote:FireServer(...)
+    end)
+    if success then
+        print("   ✅ Berhasil:", ...)
+    else
+        print("   ❌ Gagal:", err)
+    end
+    return success
+end
+
+-- =====================================================
+-- 4. Coba selesaikan tutorial via RemoteEvent (jika ada)
+-- =====================================================
+local function tryRemoteMethod()
+    if not tutorialRemote then return false end
+    
+    print("🔄 Mencoba RemoteEvent...")
+    local argsList = {
+        {player.UserId, true},
+        {player.UserId, 1},
+        {1},
+        {"Complete"},
+        {true},
+        {game.Players.LocalPlayer.UserId, "Complete", 1}
+    }
+    
+    for _, args in ipairs(argsList) do
+        trySendEvent(tutorialRemote, unpack(args))
+        task.wait(0.5)
+    end
+    return true
+end
+
+tryRemoteMethod()
+
+-- =====================================================
+-- 5. Tunggu sebentar, lalu cek apakah tutorial selesai
+-- =====================================================
+task.wait(2)
+
+local function isTutorialDone()
+    -- Cek apakah GUI tutorial masih ada
+    for _, screenGui in ipairs(gui:GetChildren()) do
+        if screenGui.Name:lower():find("tutorial") and screenGui.Enabled then
+            return false
+        end
+    end
+    -- Cek atribut player
+    local data = player:FindFirstChild("Data") or player:FindFirstChild("PlayerData")
+    if data then
+        for _, child in ipairs(data:GetChildren()) do
+            if child.Name:lower():find("tutorial") then
+                if child:IsA("BoolValue") and child.Value == true then return true end
+                if child:IsA("NumberValue") and child.Value > 0 then return true end
+            end
+        end
+    end
+    return true
+end
+
+if isTutorialDone() then
+    print("🎉 Tutorial selesai!")
+    return
+end
+
+-- =====================================================
+-- 6. Fallback: Bot klik GUI (dengan delay aman)
+-- =====================================================
+print("⚠️ RemoteEvent tidak berhasil. Gunakan bot GUI...")
+
+local function clickButton(keywords, delay)
+    for _, kw in ipairs(keywords) do
+        for _, screenGui in ipairs(gui:GetChildren()) do
+            for _, button in ipairs(screenGui:GetDescendants()) do
+                if button:IsA("TextButton") or button:IsA("ImageButton") then
+                    local name = button.Name:lower()
+                    local text = button.Text and button.Text:lower() or ""
+                    if name:find(kw:lower()) or text:find(kw:lower()) then
+                        button:Click()
+                        print("🖱️ Klik:", button.Name, "| Text:", button.Text)
+                        if delay then task.wait(delay) end
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Jalankan langkah-langkah tutorial
+print("🌱 Step 1: Beli benih wortel...")
+clickButton({"shop", "store"}, 1)
+clickButton({"carrot", "seed", "carrotseed"}, 1)
+clickButton({"buy", "purchase"}, 1)
+
+print("🌿 Step 2: Tanam benih...")
+clickButton({"inventory", "backpack"}, 1)
+clickButton({"carrot", "carrotseed"}, 1)
+clickButton({"plant", "plantseed"}, 2)
+
+print("🌾 Step 3: Panen...")
+clickButton({"harvest", "collect"}, 1)
+
+print("💰 Step 4: Jual semua...")
+clickButton({"sellall", "sellallinventory", "sell all", "sell"}, 1)
+clickButton({"confirm", "yes"}, 1)
+
+-- =====================================================
+-- 7. Verifikasi akhir
+-- =====================================================
+task.wait(2)
+
+if isTutorialDone() then
+    print("🎉 Tutorial selesai melalui bot GUI!")
+else
+    print("❌ Tutorial belum selesai. Coba selesaikan manual.")
+    print("💡 Tips: Ikuti petunjuk layar (biasanya cukup 1-2 menit).")
+end
