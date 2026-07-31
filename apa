@@ -1,11 +1,12 @@
 -- =====================================================
--- SCAN SEMUA REMOTE EVENT DAN COBA KIRIM EVENT TUTORIAL
+-- AUTO TUTORIAL COMPLETE (EVENT + GUI BOT) - NO RESTART
 -- =====================================================
 
 local player = game.Players.LocalPlayer
+local gui = player:WaitForChild("PlayerGui")
 local allRemotes = {}
 
--- Cari semua RemoteEvent di seluruh game
+-- Cari semua RemoteEvent
 local function scan(obj, path)
     for _, child in ipairs(obj:GetChildren()) do
         if child:IsA("RemoteEvent") then
@@ -16,32 +17,115 @@ local function scan(obj, path)
 end
 
 scan(game, "game")
-
 print("📡 Total RemoteEvent ditemukan: " .. #allRemotes)
 
--- Daftar event tutorial yang umum
-local tutorialEvents = {
-    "CompleteTutorial", "Tutorial", "TutComplete", "FinishTutorial", 
-    "SkipTut", "Onboarding", "TutDone", "TutorialDone", 
-    "CompleteTut", "SkipTutorial", "TutorialComplete",
-    "BuySeed", "PlantSeed", "Harvest", "SellAll"
-}
+-- Fungsi klik tombol GUI
+local function findAndClick(buttonName, extraText)
+    for _, screenGui in ipairs(gui:GetChildren()) do
+        for _, button in ipairs(screenGui:GetDescendants()) do
+            if button:IsA("TextButton") or button:IsA("ImageButton") then
+                local name = button.Name:lower()
+                local text = button.Text and button.Text:lower() or ""
+                if name:find(buttonName:lower()) or text:find(buttonName:lower()) then
+                    if extraText then
+                        if text:find(extraText:lower()) then
+                            button:Click()
+                            print("🖱️ Klik:", button.Name, "| Text:", button.Text)
+                            return true
+                        end
+                    else
+                        button:Click()
+                        print("🖱️ Klik:", button.Name, "| Text:", button.Text)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
 
--- Coba kirim event ke setiap RemoteEvent
-for _, remoteInfo in ipairs(allRemotes) do
-    local remote = remoteInfo.obj
-    local name = remote.Name
-    print("🔍 Mencoba RemoteEvent:", remoteInfo.path)
-    
-    for _, ev in ipairs(tutorialEvents) do
-        pcall(function()
-            remote:FireServer(ev, player.UserId, true)
-            remote:FireServer(ev, 1)
-            remote:FireServer(ev, "Complete")
-            print("   ✅ Berhasil mengirim:", ev, "ke", remoteInfo.path)
-        end)
+-- Cek apakah tutorial sudah selesai
+local function isTutorialComplete()
+    -- Cek atribut pemain
+    local data = player:FindFirstChild("Data") or player:FindFirstChild("PlayerData")
+    if data then
+        for _, child in ipairs(data:GetChildren()) do
+            if child.Name:lower():find("tutorial") or child.Name:lower():find("tut") then
+                if child:IsA("BoolValue") and child.Value == true then
+                    return true
+                elseif child:IsA("NumberValue") and child.Value > 0 then
+                    return true
+                end
+            end
+        end
+    end
+    -- Cek GUI tutorial
+    for _, guiObj in ipairs(gui:GetChildren()) do
+        if guiObj.Name:lower():find("tutorial") and guiObj.Enabled then
+            return false
+        end
+    end
+    return true
+end
+
+-- Kirim event tutorial ke semua RemoteEvent
+local function sendEvents()
+    local events = {
+        "CompleteTutorial", "Tutorial", "TutComplete", "FinishTutorial", 
+        "SkipTut", "Onboarding", "TutDone", "TutorialDone", 
+        "CompleteTut", "SkipTutorial", "TutorialComplete",
+        "BuySeed", "PlantSeed", "Harvest", "SellAll"
+    }
+    for _, remoteInfo in ipairs(allRemotes) do
+        local remote = remoteInfo.obj
+        for _, ev in ipairs(events) do
+            pcall(function()
+                remote:FireServer(ev, player.UserId, true)
+                remote:FireServer(ev, 1)
+                remote:FireServer(ev, "Complete")
+            end)
+        end
     end
 end
 
-print("✅ Scan selesai. Coba restart game dan lihat apakah tutorial selesai.")
-yang ini bisa tapi ubah biar gausah keluar game
+print("🚀 Mencoba menyelesaikan tutorial...")
+sendEvents()
+task.wait(2)
+
+if isTutorialComplete() then
+    print("✅ Tutorial selesai melalui RemoteEvent!")
+    return
+end
+
+print("⚠️ RemoteEvent tidak berhasil. Mencoba bot klik GUI...")
+
+-- Bot klik otomatis
+local function botClick()
+    findAndClick("Shop") or findAndClick("Store")
+    task.wait(1)
+    findAndClick("Carrot") or findAndClick("Seed") or findAndClick("CarrotSeed")
+    task.wait(1)
+    findAndClick("Buy") or findAndClick("Purchase")
+    task.wait(1)
+    findAndClick("Inventory") or findAndClick("Backpack")
+    task.wait(1)
+    findAndClick("Carrot") or findAndClick("CarrotSeed")
+    task.wait(1)
+    findAndClick("Plant") or findAndClick("PlantSeed")
+    task.wait(2)
+    findAndClick("Harvest") or findAndClick("Collect")
+    task.wait(1)
+    findAndClick("SellAll") or findAndClick("SellAllInventory")
+    task.wait(1)
+    findAndClick("Confirm") or findAndClick("Yes")
+end
+
+botClick()
+task.wait(2)
+
+if isTutorialComplete() then
+    print("✅ Tutorial selesai melalui bot klik!")
+else
+    print("❌ Gagal menyelesaikan tutorial. Coba manual sekali.")
+end
