@@ -1,131 +1,348 @@
 -- =====================================================
--- AUTO TUTORIAL COMPLETE (EVENT + GUI BOT) - NO RESTART
+--  SCRIPT GAG2 AUTO FARM + AUTO BUY + AUTO SELL v1.0
+--  Dibuat untuk Grow a Garden 2
+--  Gunakan dengan risiko sendiri!
 -- =====================================================
 
 local player = game.Players.LocalPlayer
-local gui = player:WaitForChild("PlayerGui")
-local allRemotes = {}
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local remoteEvents = replicatedStorage:WaitForChild("RemoteEvents") -- asumsi nama folder remote
 
--- Cari semua RemoteEvent
-local function scan(obj, path)
-    for _, child in ipairs(obj:GetChildren()) do
-        if child:IsA("RemoteEvent") then
-            table.insert(allRemotes, {obj = child, path = path .. "." .. child.Name})
-        end
-        scan(child, path .. "." .. child.Name)
+-- Daftar seed yang tersedia (sesuaikan dengan game)
+local seedList = {
+    "Carrot", "Strawberry", "Blueberry", "Apple", "Tomato",
+    "Corn", "Cactus", "Pineapple", "Cherry", "Dragon Fruit",
+    "Grape", "Banana", "Coconut", "Mango", "Acorn",
+    "Green Bean", "Pomegranate", "Sunflower", "Venus Fly Trap",
+    "Poison Apple", "Venom Spitter", "Tulip", "Bamboo",
+    "Atlantic Giant Pumpkin", "Moon Bloom", "Star Fruit",
+    "Hypno Bloom", "Dragon's Breath", "Sun Bloom"
+}
+
+-- ========== FUNGSI UTAMA ==========
+
+-- Fungsi untuk membeli seed
+local function buySeed(seedName)
+    local buyRemote = remoteEvents:FindFirstChild("BuySeed")
+    if buyRemote then
+        pcall(function()
+            buyRemote:FireServer(seedName)
+            print("[Auto Buy] Membeli seed: " .. seedName)
+        end)
+    else
+        warn("Remote 'BuySeed' tidak ditemukan!")
     end
 end
 
-scan(game, "game")
-print("📡 Total RemoteEvent ditemukan: " .. #allRemotes)
-
--- Fungsi klik tombol GUI
-local function findAndClick(buttonName, extraText)
-    for _, screenGui in ipairs(gui:GetChildren()) do
-        for _, button in ipairs(screenGui:GetDescendants()) do
-            if button:IsA("TextButton") or button:IsA("ImageButton") then
-                local name = button.Name:lower()
-                local text = button.Text and button.Text:lower() or ""
-                if name:find(buttonName:lower()) or text:find(buttonName:lower()) then
-                    if extraText then
-                        if text:find(extraText:lower()) then
-                            button:Click()
-                            print("🖱️ Klik:", button.Name, "| Text:", button.Text)
-                            return true
-                        end
-                    else
-                        button:Click()
-                        print("🖱️ Klik:", button.Name, "| Text:", button.Text)
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
-
--- Cek apakah tutorial sudah selesai
-local function isTutorialComplete()
-    -- Cek atribut pemain
-    local data = player:FindFirstChild("Data") or player:FindFirstChild("PlayerData")
-    if data then
-        for _, child in ipairs(data:GetChildren()) do
-            if child.Name:lower():find("tutorial") or child.Name:lower():find("tut") then
-                if child:IsA("BoolValue") and child.Value == true then
-                    return true
-                elseif child:IsA("NumberValue") and child.Value > 0 then
-                    return true
-                end
-            end
-        end
-    end
-    -- Cek GUI tutorial
-    for _, guiObj in ipairs(gui:GetChildren()) do
-        if guiObj.Name:lower():find("tutorial") and guiObj.Enabled then
-            return false
-        end
-    end
-    return true
-end
-
--- Kirim event tutorial ke semua RemoteEvent
-local function sendEvents()
-    local events = {
-        "CompleteTutorial", "Tutorial", "TutComplete", "FinishTutorial", 
-        "SkipTut", "Onboarding", "TutDone", "TutorialDone", 
-        "CompleteTut", "SkipTutorial", "TutorialComplete",
-        "BuySeed", "PlantSeed", "Harvest", "SellAll"
-    }
-    for _, remoteInfo in ipairs(allRemotes) do
-        local remote = remoteInfo.obj
-        for _, ev in ipairs(events) do
-            pcall(function()
-                remote:FireServer(ev, player.UserId, true)
-                remote:FireServer(ev, 1)
-                remote:FireServer(ev, "Complete")
-            end)
-        end
+-- Fungsi untuk menanam seed
+local function plantSeed(seedName)
+    local plantRemote = remoteEvents:FindFirstChild("PlantSeed")
+    if plantRemote then
+        pcall(function()
+            plantRemote:FireServer(seedName) -- mungkin butuh posisi, sesuaikan
+            print("[Auto Plant] Menanam: " .. seedName)
+        end)
+    else
+        warn("Remote 'PlantSeed' tidak ditemukan!")
     end
 end
 
-print("🚀 Mencoba menyelesaikan tutorial...")
-sendEvents()
-task.wait(2)
-
-if isTutorialComplete() then
-    print("✅ Tutorial selesai melalui RemoteEvent!")
-    return
+-- Fungsi untuk memanen (harvest)
+local function harvest()
+    local harvestRemote = remoteEvents:FindFirstChild("Harvest")
+    if harvestRemote then
+        pcall(function()
+            harvestRemote:FireServer()
+            print("[Auto Harvest] Memanen...")
+        end)
+    else
+        warn("Remote 'Harvest' tidak ditemukan!")
+    end
 end
 
-print("⚠️ RemoteEvent tidak berhasil. Mencoba bot klik GUI...")
-
--- Bot klik otomatis
-local function botClick()
-    findAndClick("Shop") or findAndClick("Store")
-    task.wait(1)
-    findAndClick("Carrot") or findAndClick("Seed") or findAndClick("CarrotSeed")
-    task.wait(1)
-    findAndClick("Buy") or findAndClick("Purchase")
-    task.wait(1)
-    findAndClick("Inventory") or findAndClick("Backpack")
-    task.wait(1)
-    findAndClick("Carrot") or findAndClick("CarrotSeed")
-    task.wait(1)
-    findAndClick("Plant") or findAndClick("PlantSeed")
-    task.wait(2)
-    findAndClick("Harvest") or findAndClick("Collect")
-    task.wait(1)
-    findAndClick("SellAll") or findAndClick("SellAllInventory")
-    task.wait(1)
-    findAndClick("Confirm") or findAndClick("Yes")
+-- Fungsi untuk menyiram
+local function water()
+    local waterRemote = remoteEvents:FindFirstChild("WaterPlant")
+    if waterRemote then
+        pcall(function()
+            waterRemote:FireServer()
+            print("[Auto Water] Menyiram...")
+        end)
+    else
+        warn("Remote 'WaterPlant' tidak ditemukan!")
+    end
 end
 
-botClick()
-task.wait(2)
-
-if isTutorialComplete() then
-    print("✅ Tutorial selesai melalui bot klik!")
-else
-    print("❌ Gagal menyelesaikan tutorial. Coba manual sekali.")
+-- Fungsi untuk menjual buah
+local function sellFruit()
+    local sellRemote = remoteEvents:FindFirstChild("SellFruit")
+    if sellRemote then
+        pcall(function()
+            sellRemote:FireServer()
+            print("[Auto Sell] Menjual buah...")
+        end)
+    else
+        warn("Remote 'SellFruit' tidak ditemukan!")
+    end
 end
+
+-- Fungsi untuk mencabut (shovel)
+local function shovel()
+    local shovelRemote = remoteEvents:FindFirstChild("ShovelPlant")
+    if shovelRemote then
+        pcall(function()
+            shovelRemote:FireServer()
+            print("[Auto Shovel] Mencabut tanaman...")
+        end)
+    else
+        warn("Remote 'ShovelPlant' tidak ditemukan!")
+    end
+end
+
+-- Fungsi untuk mengambil item jatuh (collect)
+local function collectDropped()
+    local collectRemote = remoteEvents:FindFirstChild("CollectDropped")
+    if collectRemote then
+        pcall(function()
+            collectRemote:FireServer()
+            print("[Auto Collect] Mengambil item...")
+        end)
+    else
+        warn("Remote 'CollectDropped' tidak ditemukan!")
+    end
+end
+
+-- ========== LOOP AUTO FARM ==========
+
+local autoFarmEnabled = false
+local autoBuyEnabled = false
+local autoSellEnabled = false
+
+local selectedSeed = "Carrot" -- seed default
+
+-- Fungsi utama loop
+local function autoFarmLoop()
+    while autoFarmEnabled do
+        -- 1. Panen
+        harvest()
+        wait(0.5)
+        
+        -- 2. Siram
+        water()
+        wait(0.5)
+        
+        -- 3. Tanam (jika ada lahan kosong)
+        plantSeed(selectedSeed)
+        wait(0.5)
+        
+        -- 4. Ambil item jatuh
+        collectDropped()
+        wait(0.5)
+        
+        -- 5. Jual jika diaktifkan
+        if autoSellEnabled then
+            sellFruit()
+            wait(0.5)
+        end
+        
+        -- 6. Beli seed jika diaktifkan
+        if autoBuyEnabled then
+            buySeed(selectedSeed)
+            wait(0.5)
+        end
+        
+        wait(1) -- jeda antar siklus
+    end
+end
+
+-- ========== GUI ==========
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoFarmGUI"
+screenGui.Parent = player.PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Auto Farm GAG2 v1.0"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+-- Dropdown seed
+local seedDropdown = Instance.new("TextBox")
+seedDropdown.Size = UDim2.new(0.9, 0, 0, 30)
+seedDropdown.Position = UDim2.new(0.05, 0, 0.1, 0)
+seedDropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+seedDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+seedDropdown.PlaceholderText = "Pilih seed (contoh: Carrot)"
+seedDropdown.Text = "Carrot"
+seedDropdown.Font = Enum.Font.SourceSans
+seedDropdown.Parent = mainFrame
+
+-- Tombol Start Auto Farm
+local startFarmBtn = Instance.new("TextButton")
+startFarmBtn.Size = UDim2.new(0.9, 0, 0, 30)
+startFarmBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+startFarmBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+startFarmBtn.Text = "Start Auto Farm"
+startFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+startFarmBtn.Font = Enum.Font.SourceSansBold
+startFarmBtn.Parent = mainFrame
+
+startFarmBtn.MouseButton1Click:Connect(function()
+    if autoFarmEnabled then
+        autoFarmEnabled = false
+        startFarmBtn.Text = "Start Auto Farm"
+        startFarmBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        print("Auto Farm dimatikan.")
+    else
+        selectedSeed = seedDropdown.Text
+        autoFarmEnabled = true
+        startFarmBtn.Text = "Stop Auto Farm"
+        startFarmBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        print("Auto Farm diaktifkan dengan seed: " .. selectedSeed)
+        spawn(autoFarmLoop)
+    end
+end)
+
+-- Tombol Auto Buy toggle
+local buyBtn = Instance.new("TextButton")
+buyBtn.Size = UDim2.new(0.4, 0, 0, 30)
+buyBtn.Position = UDim2.new(0.05, 0, 0.35, 0)
+buyBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+buyBtn.Text = "Auto Buy: OFF"
+buyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+buyBtn.Font = Enum.Font.SourceSans
+buyBtn.Parent = mainFrame
+
+buyBtn.MouseButton1Click:Connect(function()
+    autoBuyEnabled = not autoBuyEnabled
+    buyBtn.Text = autoBuyEnabled and "Auto Buy: ON" or "Auto Buy: OFF"
+    buyBtn.BackgroundColor3 = autoBuyEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 70)
+end)
+
+-- Tombol Auto Sell toggle
+local sellBtn = Instance.new("TextButton")
+sellBtn.Size = UDim2.new(0.4, 0, 0, 30)
+sellBtn.Position = UDim2.new(0.55, 0, 0.35, 0)
+sellBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+sellBtn.Text = "Auto Sell: OFF"
+sellBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+sellBtn.Font = Enum.Font.SourceSans
+sellBtn.Parent = mainFrame
+
+sellBtn.MouseButton1Click:Connect(function()
+    autoSellEnabled = not autoSellEnabled
+    sellBtn.Text = autoSellEnabled and "Auto Sell: ON" or "Auto Sell: OFF"
+    sellBtn.BackgroundColor3 = autoSellEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 70)
+end)
+
+-- Tombol aksi manual
+local harvestBtn = Instance.new("TextButton")
+harvestBtn.Size = UDim2.new(0.4, 0, 0, 30)
+harvestBtn.Position = UDim2.new(0.05, 0, 0.5, 0)
+harvestBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+harvestBtn.Text = "Harvest"
+harvestBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+harvestBtn.Font = Enum.Font.SourceSans
+harvestBtn.Parent = mainFrame
+
+harvestBtn.MouseButton1Click:Connect(function()
+    harvest()
+end)
+
+local waterBtn = Instance.new("TextButton")
+waterBtn.Size = UDim2.new(0.4, 0, 0, 30)
+waterBtn.Position = UDim2.new(0.55, 0, 0.5, 0)
+waterBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+waterBtn.Text = "Water"
+waterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+waterBtn.Font = Enum.Font.SourceSans
+waterBtn.Parent = mainFrame
+
+waterBtn.MouseButton1Click:Connect(function()
+    water()
+end)
+
+local plantBtn = Instance.new("TextButton")
+plantBtn.Size = UDim2.new(0.4, 0, 0, 30)
+plantBtn.Position = UDim2.new(0.05, 0, 0.65, 0)
+plantBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+plantBtn.Text = "Plant"
+plantBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+plantBtn.Font = Enum.Font.SourceSans
+plantBtn.Parent = mainFrame
+
+plantBtn.MouseButton1Click:Connect(function()
+    plantSeed(seedDropdown.Text)
+end)
+
+local shovelBtn = Instance.new("TextButton")
+shovelBtn.Size = UDim2.new(0.4, 0, 0, 30)
+shovelBtn.Position = UDim2.new(0.55, 0, 0.65, 0)
+shovelBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+shovelBtn.Text = "Shovel"
+shovelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+shovelBtn.Font = Enum.Font.SourceSans
+shovelBtn.Parent = mainFrame
+
+shovelBtn.MouseButton1Click:Connect(function()
+    shovel()
+end)
+
+local sellManualBtn = Instance.new("TextButton")
+sellManualBtn.Size = UDim2.new(0.4, 0, 0, 30)
+sellManualBtn.Position = UDim2.new(0.05, 0, 0.8, 0)
+sellManualBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+sellManualBtn.Text = "Sell All"
+sellManualBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+sellManualBtn.Font = Enum.Font.SourceSans
+sellManualBtn.Parent = mainFrame
+
+sellManualBtn.MouseButton1Click:Connect(function()
+    sellFruit()
+end)
+
+local collectBtn = Instance.new("TextButton")
+collectBtn.Size = UDim2.new(0.4, 0, 0, 30)
+collectBtn.Position = UDim2.new(0.55, 0, 0.8, 0)
+collectBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+collectBtn.Text = "Collect"
+collectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+collectBtn.Font = Enum.Font.SourceSans
+collectBtn.Parent = mainFrame
+
+collectBtn.MouseButton1Click:Connect(function()
+    collectDropped()
+end)
+
+-- Tombol close
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0.1, 0, 0.07, 0)
+closeBtn.Position = UDim2.new(0.9, 0, 0, 0)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.Parent = mainFrame
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+    print("GUI ditutup.")
+end)
+
+-- Pesan awal
+print("Skrip Auto Farm GAG2 dimuat! Gunakan GUI untuk mengatur.")
